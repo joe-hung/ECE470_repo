@@ -25,9 +25,24 @@ SPIN_RATE = 20
 home = np.radians([120, -90, 90, -90, -90, 0])
 
 # Hanoi tower location 1
-Q11 = [120*pi/180.0, -56*pi/180.0, 124*pi/180.0, -158*pi/180.0, -90*pi/180.0, 0*pi/180.0]
-Q12 = [120*pi/180.0, -64*pi/180.0, 123*pi/180.0, -148*pi/180.0, -90*pi/180.0, 0*pi/180.0]
-Q13 = [120*pi/180.0, -72*pi/180.0, 120*pi/180.0, -137*pi/180.0, -90*pi/180.0, 0*pi/180.0]
+Q01 = [170.91*pi/180.0, -49.57*pi/180.0, 104*pi/180.0, -142.85*pi/180.0, -92.42*pi/180.0, 1.09*pi/180.0]
+Q02 = [170.91*pi/180.0, -55.20*pi/180.0, 102*pi/180.0, -135.62*pi/180.0, -92.43*pi/180.0, 1.09*pi/180.0]
+Q03 = [170.91*pi/180.0, -60.69*pi/180.0, 100.18*pi/180.0, -127.89*pi/180.0, -92.43*pi/180.0, 1.09*pi/180.0]
+# Hanoi tower location 2
+Q11 = [180.78*pi/180.0, -47.34*pi/180.0, 99.15*pi/180.0, -139.1*pi/180.0, -92.1*pi/180.0, 11.2*pi/180.0]
+Q12 = [180.78*pi/180.0, -52.79*pi/180.0, 97*pi/180.0, -132.49*pi/180.0, -92.11*pi/180.0, 11.2*pi/180.0]
+Q13 = [180.78*pi/180.0, -57.57*pi/180.0, 98.85*pi/180.0, -133.3*pi/180.0, -92.11*pi/180.0, 11.18*pi/180.0]
+# Hanoi tower location 3
+Q21 = [190*pi/180.0, -44.15*pi/180.0, 90.91*pi/180.0, -134.42*pi/180.0, -91.75*pi/180.0, 20.42*pi/180.0]
+Q22 = [190*pi/180.0, -49.16*pi/180.0, 89.9*pi/180.0, -128.41*pi/180.0, -91.75*pi/180.0, 20.41*pi/180.0]
+Q23 = [190*pi/180.0, -53.87*pi/180.0, 87.55*pi/180.0, -121.16*pi/180.0, -91.75*pi/180.0, 20.41*pi/180.0]
+# Hanoi tower hover point
+Q_hover0 = [170.4*pi/180.0, -71.*pi/180.0, 89.5*pi/180.0, -107.02*pi/180.0, -92.43*pi/180.0, 0.83*pi/180.0]
+
+Q_hover1 = [179.82*pi/180.0, -68.02*pi/180.0, 85.12*pi/180.0, -105.24*pi/180.0, -92.3*pi/180.0, 10.2*pi/180.0]
+
+Q_hover2 = [189.54*pi/180.0, -62.4*pi/180.0, 76.57*pi/180.0, -101.93*pi/180.0, -91.8*pi/180.0, 20*pi/180.0]
+
 
 thetas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
@@ -47,9 +62,9 @@ current_position = copy.deepcopy(home)
 TODO: Initialize Q matrix
 """
 
-Q = [ [Q11, Q12, Q13], \
-      [Q11, Q12, Q13], \
-      [Q11, Q12, Q13] ]
+Q = [ [Q01, Q02, Q03, Q_hover0], \
+      [Q11, Q12, Q13, Q_hover1], \
+      [Q21, Q22, Q23, Q_hover2]]
 ############### Your Code End Here ###############
 
 ############## Your Code Start Here ##############
@@ -59,9 +74,8 @@ TODO: define a ROS topic callback funtion for getting the state of suction cup
 Whenever ur3/gripper_input publishes info this callback function is called.
 """
 def cb_gripper(msg):
-
-    return
-
+    global analog_in_0
+    analog_in_0 = msg.AIN0
 
 
 ############### Your Code End Here ###############
@@ -185,11 +199,27 @@ def move_arm(pub_cmd, loop_rate, dest, vel, accel):
 def move_block(pub_cmd, loop_rate, start_loc, start_height, \
                end_loc, end_height):
     global Q
+    global suction_on
+    global suction_off
+    global analog_in_0
 
     ### Hint: Use the Q array to map out your towers by location and "height".
 
     error = 0
 
+    error = move_arm(pub_cmd,loop_rate,Q[start_loc][3],4,4)
+    error = move_arm(pub_cmd,loop_rate,Q[start_loc][start_height],4,4)
+    error = gripper(pub_cmd, loop_rate, suction_on)
+    time.sleep(1)
+    if(analog_in_0 < 1.8):
+        error = gripper(pub_cmd, loop_rate, suction_off)
+        sys.exit()
+    error = move_arm(pub_cmd,loop_rate,Q[start_loc][3],4,4)
+    error = move_arm(pub_cmd,loop_rate,Q[end_loc][3],4,4)
+    error = move_arm(pub_cmd,loop_rate,Q[end_loc][end_height],4,4)
+    error = gripper(pub_cmd, loop_rate, suction_off)
+    time.sleep(1)
+    error = move_arm(pub_cmd,loop_rate,Q[end_loc][3],4,4)
 
 
     return error
@@ -227,25 +257,36 @@ def main():
 
     input_done = 0
     loop_count = 0
-
+    source = 0
+    buffer = 1
+    des = 2
     while(not input_done):
-        input_string = input("Enter number of loops <Either 1 2 3 or 0 to quit> ")
+        input_string = input("Enter [source, destination] or q to quit> ")
         print("You entered " + input_string + "\n")
-
-        if(int(input_string) == 1):
-            input_done = 1
-            loop_count = 1
-        elif (int(input_string) == 2):
-            input_done = 1
-            loop_count = 2
-        elif (int(input_string) == 3):
-            input_done = 1
-            loop_count = 3
-        elif (int(input_string) == 0):
+        # "[1 3]"
+        if (input_string == 'q'):
             print("Quitting... ")
             sys.exit()
+        source = int(input_string[1])
+        des = int(input_string[3])
+        buffer = 3 - des - source
+
+        if(source == buffer or source == des or des == buffer):
+            print("wrong input, please enter again!")
+            input_done = 0
+        elif(source > 2 or buffer > 2 or des > 2):
+            print("wrong input, please enter again!")
+            input_done = 0
         else:
-            print("Please just enter the character 1 2 3 or 0 to quit \n\n")
+            input_done = 1
+        # elif (int(input_string) == 2):
+        #     input_done = 1
+        #     loop_count = 2
+        # elif (int(input_string) == 3):
+        #     input_done = 1
+        #     loop_count = 3
+        # else:
+        #     print("Please just enter the character 1 2 3 or 0 to quit \n\n")
 
 
 
@@ -264,26 +305,45 @@ def main():
     ############## Your Code Start Here ##############
     # TODO: modify the code so that UR3 can move tower accordingly from user input
 
-    while(loop_count > 0):
+    # init position
+    move_arm(pub_command, loop_rate, Q_hover1, 4.0, 4.0)
 
-        move_arm(pub_command, loop_rate, home, 4.0, 4.0)
+    # 1. S_3 -> D_1
+    move_block(pub_command,loop_rate,source,2,des,0)
 
-        rospy.loginfo("Sending goal 1 ...")
-        move_arm(pub_command, loop_rate, Q[0][0], 4.0, 4.0)
+    move_block(pub_command,loop_rate,source,1,buffer,0)
 
-        gripper(pub_command, loop_rate, suction_on)
-        # Delay to make sure suction cup has grasped the block
-        time.sleep(1.0)
+    move_block(pub_command,loop_rate,des,0,buffer,1)
 
-        rospy.loginfo("Sending goal 2 ...")
-        move_arm(pub_command, loop_rate, Q[1][1], 4.0, 4.0)
+    move_block(pub_command,loop_rate,source,0,des,0)
 
-        rospy.loginfo("Sending goal 3 ...")
-        move_arm(pub_command, loop_rate, Q[2][0], 4.0, 4.0)
+    move_block(pub_command,loop_rate,buffer,1,source,0)
 
-        loop_count = loop_count - 1
+    move_block(pub_command,loop_rate,buffer,0,des,1)
 
-    gripper(pub_command, loop_rate, suction_off)
+    move_block(pub_command,loop_rate,source,0,des,2)
+
+
+    # while(loop_count > 0):
+
+    #     move_arm(pub_command, loop_rate, home, 4.0, 4.0)
+
+    #     rospy.loginfo("Sending goal 1 ...")
+    #     move_arm(pub_command, loop_rate, Q[0][0], 4.0, 4.0)
+
+    #     gripper(pub_command, loop_rate, suction_on)
+    #     # Delay to make sure suction cup has grasped the block
+    #     time.sleep(1.0)
+
+    #     rospy.loginfo("Sending goal 2 ...")
+    #     move_arm(pub_command, loop_rate, Q[1][1], 4.0, 4.0)
+
+    #     rospy.loginfo("Sending goal 3 ...")
+    #     move_arm(pub_command, loop_rate, Q[2][0], 4.0, 4.0)
+
+    #     loop_count = loop_count - 1
+
+    # gripper(pub_command, loop_rate, suction_off)
 
 
 
