@@ -18,8 +18,6 @@ def Get_MS():
 
 	q = np.array([[-150,150,10],[-150,270,162],[94,270,162],[307,177,162],[307,260,162],[390,260,162]])
 
-	# print(np.cross(-w[0],q[0])
-
 	v = np.array([np.cross(-w[0],q[0]),np.cross(-w[1],q[1]),np.cross(-w[2],q[2]),np.cross(-w[3],q[3]),np.cross(-w[4],q[4]),np.cross(-w[5],q[5])])
 	
 	S = np.concatenate((w,v),axis=1)
