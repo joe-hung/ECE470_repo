@@ -21,8 +21,10 @@ go_away = [270*PI/180.0, -90*PI/180.0, 90*PI/180.0, -90*PI/180.0, -90*PI/180.0, 
 
 # Store world coordinates of green and yellow blocks
 xw_yw_G = []
-xw_yw_Y = []
+xw_yw_P = []
 
+G_goal = [[0.3252, 0.2101, 0.0310], [0.26719,0.2041,0.031]]
+P_goal = [[0.264,0.2664,0.031], [0.3254, 0.2702, 0.031]]
 # Any other global variable you want to define
 # Hints: where to put the blocks?
 
@@ -59,9 +61,10 @@ Whenever ur3/gripper_input publishes info this callback function is called.
 """
 def input_callback(msg):
 
-    global digital_in_0
-    digital_in_0 = msg.DIGIN
-    digital_in_0 = digital_in_0 & 1 # Only look at least significant bit, meaning index 0
+    global analog_in_0
+    analog_in_0 = msg.AIN0
+    # digital_in_0 = msg.DIGIN
+    # digital_in_0 = digital_in_0 & 1 # Only look at least significant bit, meaning index 0
 
 
 """
@@ -217,8 +220,9 @@ def move_block(pub_cmd, loop_rate, start_xw_yw_zw, target_xw_yw_zw, vel, accel):
     error = move_arm(pub_cmd,loop_rate,start_angles,vel,accel)
 
     error = gripper(pub_cmd, loop_rate, suction_on)
-    time.sleep(1)
-    if(analog_in_0 < 1.8):
+    time.sleep(2)
+    print(analog_in_0)
+    if(analog_in_0 < 1.3):
         error = gripper(pub_cmd, loop_rate, suction_off)
         sys.exit()
     error = move_arm(pub_cmd,loop_rate,start_angles_hover,vel,accel)
@@ -251,7 +255,7 @@ class ImageConverter:
     def image_callback(self, data):
 
         global xw_yw_G # store found green blocks in this list
-        global xw_yw_Y # store found yellow blocks in this list
+        global xw_yw_P # store found yellow blocks in this list
 
         try:
           # Convert ROS image to OpenCV image
@@ -263,17 +267,21 @@ class ImageConverter:
         cv2.line(cv_image, (0,50), (640,50), (0,0,0), 5)
 
         # You will need to call blob_search() function to find centers of green blocks
-        # and yellow blocks, and store the centers in xw_yw_G & xw_yw_Y respectively.
+        # and yellow blocks, and store the centers in xw_yw_G & xw_yw_P respectively.
 
         # If no blocks are found for a particular color, you can return an empty list,
-        # to xw_yw_G or xw_yw_Y.
+        # to xw_yw_G or xw_yw_P.
 
-        # Remember, xw_yw_G & xw_yw_Y are in global coordinates, which means you will
+        # Remember, xw_yw_G & xw_yw_P are in global coordinates, which means you will
         # do coordinate transformation in the blob_search() function, namely, from
         # the image frame to the global world frame.
 
-        xw_yw_G = blob_search(cv_image, "green")
-        xw_yw_Y = blob_search(cv_image, "yellow")
+        blob_search(cv_image, "Green")
+
+        if (len(xw_yw_G) < 2):
+            xw_yw_G = blob_search(cv_image, "Green")
+        if (len(xw_yw_P) < 2):    
+            xw_yw_P = blob_search(cv_image, "Pink")
 
 
 """
@@ -282,8 +290,10 @@ Program run from here
 def main():
 
     global go_away
-    global xw_yw_R
+    global xw_yw_P
     global xw_yw_G
+    global G_goal
+    global P_goal
 
     # global variable1
     # global variable2
@@ -316,10 +326,34 @@ def main():
     # ========================= Student's code starts here =========================
 
     """
-    Hints: use the found xw_yw_G, xw_yw_Y to move the blocks correspondingly. You will
+    Hints: use the found xw_yw_G, xw_yw_P to move the blocks correspondingly. You will
     need to call move_block(pub_command, loop_rate, start_xw_yw_zw, target_xw_yw_zw, vel, accel)
     """
-    move_block(pub_command,loop_rate, )
+
+    # lab_fk(thetas[0] - np.pi,thetas[1],thetas[2],thetas[3] + (0.5*np.pi),thetas[4],thetas[5])
+
+    time.sleep(5)
+
+    
+    # print(xw_yw_P)
+    xw_yw_zw_P = []
+    xw_yw_zw_G = []
+
+    for xw_yw in xw_yw_P:
+        xw_yw_zw_P.append([xw_yw[0][0],xw_yw[1][0], 0.031])
+
+    for xw_yw in xw_yw_G:
+        xw_yw_zw_G.append([xw_yw[0][0],xw_yw[1][0], 0.031])
+
+    # print(xw_yw_zw_P)
+
+    if (len(xw_yw_zw_P) == 2):
+        move_block(pub_command,loop_rate, xw_yw_zw_P[0],P_goal[0],vel,accel)
+        move_block(pub_command,loop_rate, xw_yw_zw_P[1],P_goal[1],vel,accel)
+    
+    if (len(xw_yw_zw_G) == 2):
+        move_block(pub_command,loop_rate, xw_yw_zw_G[0],G_goal[0],vel,accel)
+        move_block(pub_command,loop_rate, xw_yw_zw_G[1],G_goal[1],vel,accel)
 
 
     # ========================= Student's code ends here ===========================

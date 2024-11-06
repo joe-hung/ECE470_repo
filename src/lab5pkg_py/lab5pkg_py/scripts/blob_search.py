@@ -86,10 +86,10 @@ def blob_search(image_raw, color):
     o_upper = (20, 255, 255)
 
 
-    if(color=="green"):
+    if(color=="Green"):
         lower = g_lower
         upper = g_upper
-    elif(color == "pink"):
+    elif(color == "Pink"):
         lower = p_lower
         upper = p_upper
     else:
@@ -131,7 +131,7 @@ def blob_search(image_raw, color):
             xw_yw.append(IMG2W(blob_image_center[i][0], blob_image_center[i][1]))
             # print(i, blob_image_center[i][0], blob_image_center[i][1])
             # print()
-            xy = IMG2W(blob_image_center[i][0], blob_image_center[i][1])
+            # xy = IMG2W(blob_image_center[i][0], blob_image_center[i][1])
             # print(i,  xy[0], xy[1])
             # print()
     
@@ -141,8 +141,8 @@ def blob_search(image_raw, color):
     cv2.imshow("Camera View", image_raw)
     cv2.namedWindow("Mask View")
     cv2.imshow("Mask View", mask_image)
-    # cv2.namedWindow("Keypoint View")
-    # cv2.imshow("Keypoint View", im_with_keypoints)
+    cv2.namedWindow("Keypoint View")
+    cv2.imshow("Keypoint View", im_with_keypoints)
 
     cv2.waitKey(2)
 
