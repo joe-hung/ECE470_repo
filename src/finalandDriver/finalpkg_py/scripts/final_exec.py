@@ -12,6 +12,8 @@ import numpy as np
 from final_header import *
 from final_func import *
 
+import imutils
+
 
 ################ Pre-defined parameters and functions below (can change if needed) ################
 
@@ -166,6 +168,44 @@ def move_arm(pub_cmd, loop_rate, dest, vel, accel, move_type):
 
 ##========= TODO: Helper Functions =========##
 
+def find_keypoints_2(image, sample_num=1500):
+    
+    thresh_min = 160
+    thresh_max = 180
+    
+    gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    output = np.zeros_like(gray_img)
+    
+    #2. Gaussian blur the image
+    blur_img = cv2.GaussianBlur(gray_img, (3,3), 0)
+    
+    # binary_output = cv2.threshold(blur_img, thresh_min, thresh_max, cv2.THRESH_BINARY)[1]
+    Canny_output = cv2.Canny(blur_img,thresh_min, thresh_max)
+    contours, hierarchy = cv2.findContours(Canny_output, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1) #cv2.CHAIN_APPROX_TC89_L1
+    new_contours = []
+    
+    # print(hierarchy)
+    
+    
+    
+    k_num = 0
+    for con in contours:
+        k_num = k_num + len(con)
+    
+    sample_rate = max(int(k_num/sample_num)+1,1)
+    num = 0
+    for index,con in enumerate(contours):
+        new_contour = np.array(con[::sample_rate, : , :])
+        new_contours.append(new_contour)
+        num = num+len(new_contour)
+    print(num)
+    cv2.drawContours(output, new_contours, -1, 255, 3)
+    cv2.imshow("contours", output)
+    cv2.waitKey(0)
+    
+    return new_contours
+
 def find_keypoints(image):
     """Gets keypoints from the given image
 
@@ -188,6 +228,7 @@ def find_keypoints(image):
         
     #2. Gaussian blur the image
     blur_img = cv2.GaussianBlur(gray_img, (3,3), 0)
+    # blur_img = gray_img
         
     #3. Use cv2.Sobel() to find derievatives for both X and Y Axis
     Gx = cv2.Sobel(blur_img, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=3)
@@ -196,61 +237,103 @@ def find_keypoints(image):
     Gx = cv2.convertScaleAbs(Gx)
     Gy = cv2.convertScaleAbs(Gy)
 
-    # m = cv2.magnitude(Gx,Gy)
+    # m = cv2.addWeighted(Gx, 0.5, Gy, 0.5, 0)
 
     # m = cv2.normalize(m,None,0.,255.,cv2.NORM_MINMAX,cv2.CV_8U)
         
     #4. Use cv2.addWeighted() to combine the results
     sobel_img = cv2.addWeighted(Gx, 0.5, Gy, 0.5, 0)
+    # sobel_img = cv2.normalize(sobel_img,None,0.,255.,cv2.NORM_MINMAX,cv2.CV_8U)
+    
+    # sobel_img = cv2.ximgproc.thinning(sobel_img,None,cv2.ximgproc.THINNING_GUOHALL)
         
     #5. Convert each pixel to unint8, then apply threshold to get binary image
     binary_output = cv2.threshold(sobel_img, thresh_min, thresh_max, cv2.THRESH_BINARY)[1]
-
+    
+    # binary_output = cv2.threshold(m, thresh_min, thresh_max, cv2.THRESH_BINARY)[1]
+    
     cv2.imshow("edge", binary_output)
     cv2.waitKey(0)
 
     contours, hierarchy = cv2.findContours(binary_output,  
-    cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
-    print("Number of Contours found = " + str(len(contours)))
-
-    print(contours)
-
-    pt_array = []
-    pts = []
-    for contour in contours:
-        for index,pt in enumerate(contour):
-            if(index%10 == 0):
-                pts.append(pt[0])
-            # pts.append(pt[0])
-        pt_array.append(np.array(pts))
-        pts = []
-    reduced_contours = pt_array
-    # print(contours)
-    # print(len(contours[0]))
-    print(len(reduced_contours))
-    print(reduced_contours)
-
-
+    cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_L1)
+    
     img = cv2.cvtColor(binary_output,cv2.COLOR_GRAY2BGR)
-    cv2.drawContours(img, contours, -1, (0, 255, 0), 3) 
-  
-    cv2.imshow('Contours', img) 
-    cv2.waitKey(0) 
-
-    img = cv2.cvtColor(binary_output,cv2.COLOR_GRAY2BGR)
-    for reduced_contour in reduced_contours:
-        for i in range(len(reduced_contour)):
-            if(i+1 != len(reduced_contour)):
-                cv2.line(img, reduced_contour[i],reduced_contour[i+1], (0, 255, 0), 1) 
-
-    cv2.imshow('reduced Contours', img) 
-    cv2.waitKey(0) 
-
-    cv2.destroyAllWindows() 
-
-
+    # test
+    # contours = imutils.grab_contours(contours)
+    # con = max(contours, key=cv2.contourArea)
+    
     keypoints = []
+    
+    output = img.copy()
+    eps = 0.006 #0.001
+    num_pts = 0
+    for con in contours:
+        cv2.drawContours(output, [con], -1, (0, 255, 0), 3)
+        (x, y, w, h) = cv2.boundingRect(con)
+        # text = "original, num_pts={}".format(len(con))
+        # cv2.putText(output, text, (x, y - 15), cv2.FONT_HERSHEY_SIMPLEX,0.9, (0, 255, 0), 2)
+        # print("[INFO] {}".format(text))
+        # cv2.imshow("Original Contour", output)
+        # cv2.waitKey(0)
+        
+        # for eps in np.linspace(0.001, 0.05, 10):
+        # approximate the contour
+        peri = cv2.arcLength(con, True)
+        approx = cv2.approxPolyDP(con, eps * peri, True)
+        # draw the approximated contour on the image
+        # cv2.drawContours(output, [approx], -1, (0, 255, 0), 3)
+        keypoints.append([approx])
+            
+        num_pts = num_pts + len(approx)
+    
+    text = "eps={:.4f}, num_pts={}".format(eps, num_pts)
+    cv2.putText(output, text, (x, y - 15), cv2.FONT_HERSHEY_SIMPLEX,0.9, (0, 255, 0), 2)
+    # show the approximated contour image
+    print("[INFO] {}".format(text))
+    cv2.imshow("Approximated Contour", output)
+    cv2.waitKey(0)
+
+    
+
+    # print("Number of Contours found = " + str(len(contours)))
+
+    # # print(contours)
+
+    # pt_array = []
+    # pts = []
+    # for contour in contours:
+    #     for index,pt in enumerate(contour):
+    #         pts.append(pt[0])
+    #     pt_array.append(np.array(pts))
+    #     pts = []
+    # reduced_contours = pt_array
+    # # print(contours)
+    print(len(contours))
+    # print(len(reduced_contours))
+    # # print(reduced_contours)
+
+    # cv2.drawContours(img, contours, -1, (0, 255, 0), 3) 
+  
+    # cv2.imshow('Contours', img) 
+    # cv2.waitKey(0) 
+    
+    # num = 0
+    
+    # img = cv2.cvtColor(binary_output,cv2.COLOR_GRAY2BGR)
+    # for reduced_contour in reduced_contours:
+    #     for i in range(len(reduced_contour)):
+    #         if(i+1 != len(reduced_contour)):
+    #             cv2.line(img, reduced_contour[i],reduced_contour[i+1], (0, 255, 0), 1) 
+    #             num = num + len(reduced_contour)
+
+    # print(num)
+    # cv2.imshow('reduced Contours', img) 
+    # cv2.waitKey(0) 
+
+    # cv2.destroyAllWindows() 
+    # print(keypoints)
+
     return keypoints
 
 def IMG2W(row, col, image):
@@ -272,10 +355,33 @@ def IMG2W(row, col, image):
     y : float
         y position in the world frame
     """
-    x, y = 0.0, 0.0
+    
+    height, width, channels = image.shape
+    
+    beta = max(height/0.23,width/0.19)
+    
+    
+    base_y = 0.25 - 0.05
+    base_x = 0.26 + 0.015
+    
+    img_x = (row - height/2)/beta + base_x
+    img_y = (col - width/2)/beta + base_y
+
+    # Tcw = np.array([
+    #     [1, 0, base_x],
+    #     [0, 1, base_y],
+    #     [0,0,1]
+    # ])
+
+    # Twc = np.linalg.inv(Tcw)
+    # img_c = np.array([[img_x, img_y, 1]]).T
+    # img_w = Twc@img_c/beta
+    # return([img_w[0],img_w[1]])
+
+    x, y = img_x, img_y
     return x, y
 
-def draw_image(world_keypoints):
+def draw_image(pub_command, loop_rate, vel, accel,world_keypoints):
     """Draw the image based on detecte keypoints in world coordinates
 
     Parameters
@@ -283,7 +389,27 @@ def draw_image(world_keypoints):
     world_keypoints:
         a list of keypoints detected in world coordinates
     """
-    pass
+    for pts in world_keypoints:
+        for index,pt in enumerate(pts):
+            x = pt[0]
+            y = pt[1]
+            
+            # print((x,y))
+            if (index == 0):
+                z = 0.023
+                thetas = lab_invk(x,y,z,0)
+                move_arm(pub_command,loop_rate,thetas,vel,accel,'J')
+            z = 0.0195# 0.021
+            thetas = lab_invk(x,y,z,0)
+            move_arm(pub_command,loop_rate,thetas,vel,accel,'L')
+            if(index == len(pts)-1):
+                z = 0.023
+                thetas = lab_invk(x,y,z,0)
+                move_arm(pub_command,loop_rate,thetas,vel,accel,'L')
+                print("lift")
+
+    
+    # pass
 
 
 """
@@ -315,20 +441,30 @@ def main():
     # Velocity and acceleration of the UR3 arm
     vel = 4.0
     accel = 4.0
-    # move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Move to the home position
+    move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Move to the home position
 
     ##========= TODO: Read and draw a given image =========##
     cwd = os.getcwd()
     print(cwd)
-    input_img = cv2.imread(cwd+"/images/turkey.png")
+    input_img = cv2.imread(cwd+"/images/zigzag.jpg")
     # cv2.imshow("original", input_img)
     # cv2.waitKey(0)
 
-    keypoints = find_keypoints(image=input_img)
-     
+    keypoints = find_keypoints_2(image=input_img,sample_num=1500)
+    world_keypoints = []
+    for pts in keypoints:
+        pt_array = []
+        for pt in pts:
+            # print(pt)
+            x_w,y_w = IMG2W(pt[0][1],pt[0][0],input_img)
+            pt_array.append([x_w,y_w])
+        world_keypoints.append(pt_array)
+    
+    # print(len(world_keypoints))
+    # draw_image(pub_command, loop_rate, vel, accel,world_keypoints)
 
 
-    # move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
+    move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
     rospy.loginfo("Task Completed!")
     print("Use Ctrl+C to exit program")
     rospy.spin()
