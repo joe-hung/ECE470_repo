@@ -358,7 +358,7 @@ def IMG2W(row, col, image):
     
     height, width, channels = image.shape
     
-    beta = max(height/0.23,width/0.19)
+    beta = max(height/0.21,width/0.17)
     
     
     base_y = 0.25 - 0.05
@@ -396,14 +396,14 @@ def draw_image(pub_command, loop_rate, vel, accel,world_keypoints):
             
             # print((x,y))
             if (index == 0):
-                z = 0.023
+                z = 0.02
                 thetas = lab_invk(x,y,z,0)
                 move_arm(pub_command,loop_rate,thetas,vel,accel,'J')
-            z = 0.0195# 0.021
+            z = 0.0172# 0.021
             thetas = lab_invk(x,y,z,0)
             move_arm(pub_command,loop_rate,thetas,vel,accel,'L')
             if(index == len(pts)-1):
-                z = 0.023
+                z = 0.02
                 thetas = lab_invk(x,y,z,0)
                 move_arm(pub_command,loop_rate,thetas,vel,accel,'L')
                 print("lift")
@@ -446,11 +446,11 @@ def main():
     ##========= TODO: Read and draw a given image =========##
     cwd = os.getcwd()
     print(cwd)
-    input_img = cv2.imread(cwd+"/images/zigzag.jpg")
+    input_img = cv2.imread(cwd+"/images/status.png")
     # cv2.imshow("original", input_img)
     # cv2.waitKey(0)
 
-    keypoints = find_keypoints_2(image=input_img,sample_num=1500)
+    keypoints = find_keypoints_2(image=input_img,sample_num=1000)
     world_keypoints = []
     for pts in keypoints:
         pt_array = []
@@ -461,7 +461,7 @@ def main():
         world_keypoints.append(pt_array)
     
     # print(len(world_keypoints))
-    # draw_image(pub_command, loop_rate, vel, accel,world_keypoints)
+    draw_image(pub_command, loop_rate, vel, accel,world_keypoints)
 
 
     move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
