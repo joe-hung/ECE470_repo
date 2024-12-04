@@ -196,9 +196,11 @@ def find_keypoints_2(image, sample_num=1500):
     sample_rate = max(int(k_num/sample_num)+1,1)
     num = 0
     for index,con in enumerate(contours):
-        new_contour = np.array(con[::sample_rate, : , :])
-        new_contours.append(new_contour)
-        num = num+len(new_contour)
+        if con.shape[0] > 3:
+            new_contour = np.array(con[::sample_rate, : , :])
+            if new_contour.shape[0] > 3:
+                new_contours.append(new_contour)
+                num = num+len(new_contour)
     print(num)
     cv2.drawContours(output, new_contours, -1, 255, 3)
     cv2.imshow("contours", output)
@@ -271,12 +273,6 @@ def find_keypoints(image):
     for con in contours:
         cv2.drawContours(output, [con], -1, (0, 255, 0), 3)
         (x, y, w, h) = cv2.boundingRect(con)
-        # text = "original, num_pts={}".format(len(con))
-        # cv2.putText(output, text, (x, y - 15), cv2.FONT_HERSHEY_SIMPLEX,0.9, (0, 255, 0), 2)
-        # print("[INFO] {}".format(text))
-        # cv2.imshow("Original Contour", output)
-        # cv2.waitKey(0)
-        
         # for eps in np.linspace(0.001, 0.05, 10):
         # approximate the contour
         peri = cv2.arcLength(con, True)
@@ -367,16 +363,6 @@ def IMG2W(row, col, image):
     img_x = (row - height/2)/beta + base_x
     img_y = (col - width/2)/beta + base_y
 
-    # Tcw = np.array([
-    #     [1, 0, base_x],
-    #     [0, 1, base_y],
-    #     [0,0,1]
-    # ])
-
-    # Twc = np.linalg.inv(Tcw)
-    # img_c = np.array([[img_x, img_y, 1]]).T
-    # img_w = Twc@img_c/beta
-    # return([img_w[0],img_w[1]])
 
     x, y = img_x, img_y
     return x, y
@@ -396,14 +382,14 @@ def draw_image(pub_command, loop_rate, vel, accel,world_keypoints):
             
             # print((x,y))
             if (index == 0):
-                z = 0.02
+                z = 0.021
                 thetas = lab_invk(x,y,z,0)
                 move_arm(pub_command,loop_rate,thetas,vel,accel,'J')
-            z = 0.0172# 0.021
+            z = 0.0165# 0.021
             thetas = lab_invk(x,y,z,0)
             move_arm(pub_command,loop_rate,thetas,vel,accel,'L')
             if(index == len(pts)-1):
-                z = 0.02
+                z = 0.021
                 thetas = lab_invk(x,y,z,0)
                 move_arm(pub_command,loop_rate,thetas,vel,accel,'L')
                 print("lift")
@@ -439,18 +425,25 @@ def main():
     loop_rate = rospy.Rate(SPIN_RATE)
 
     # Velocity and acceleration of the UR3 arm
-    vel = 4.0
-    accel = 4.0
-    move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Move to the home position
+    vel = 10.0
+    accel = 12.0
+    # move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Move to the home position
 
     ##========= TODO: Read and draw a given image =========##
     cwd = os.getcwd()
     print(cwd)
-    input_img = cv2.imread(cwd+"/images/status.png")
+    input_img = cv2.imread(cwd+"/images/rob.png")
     # cv2.imshow("original", input_img)
     # cv2.waitKey(0)
+    # base_y = 0.25 - 0.05
+    # base_x = 0.26 + 0.015
+    x_c = 0.26 + 0.015
+    y_c = 0.25 - 0.05
+    z_c = 0.021
+    thetas_c = lab_invk(x_c,y_c,z_c,0)
+    move_arm(pub_command, loop_rate, thetas_c, vel, accel, 'J')
 
-    keypoints = find_keypoints_2(image=input_img,sample_num=1000)
+    keypoints = find_keypoints_2(image=input_img,sample_num=500)
     world_keypoints = []
     for pts in keypoints:
         pt_array = []
@@ -462,9 +455,11 @@ def main():
     
     # print(len(world_keypoints))
     draw_image(pub_command, loop_rate, vel, accel,world_keypoints)
+    
+    move_arm(pub_command, loop_rate, thetas_c, vel, accel, 'J')
 
 
-    move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
+    # move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
     rospy.loginfo("Task Completed!")
     print("Use Ctrl+C to exit program")
     rospy.spin()
